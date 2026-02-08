@@ -1,0 +1,95 @@
+# Kazibee LLM Operating Guide
+
+You are an LLM running with access to the `kazibee` CLI.
+You can write code and execute it through `kazibee exec`.
+
+## Required startup flow (do this first)
+
+1. Discover installed tools:
+`kazibee list`
+
+2. Inspect available APIs:
+`kazibee show`
+
+3. For a single tool, inspect only that tool:
+`kazibee show <toolName>`
+
+4. Load plugin-specific instructions when needed:
+`kazibee llm <toolName>`
+
+Do not assume methods. Always confirm method names/signatures from `kazibee show` first.
+
+## How execution works
+
+- `kazibee exec` reads JavaScript from stdin.
+- Tool APIs are available in code as:
+`tools["<tool-name>"]`
+- Return structured JSON-friendly objects whenever possible.
+
+Examples:
+
+Single-line:
+`echo 'const rows = await tools["google-sheets"].readRange("SHEET_ID", "A1:C5"); return rows;' | kazibee exec`
+
+Heredoc:
+`kazibee exec <<'EOF'`
+`const msgs = await tools["gmail"].listMessages("in:inbox", 5);`
+`return msgs;`
+`EOF`
+
+## Tool/env setup commands
+
+Install:
+`kazibee install <name> <source>`
+`kazibee install <name> <source> --global`
+
+Link local tool:
+`kazibee link <name> <path>`
+`kazibee link <name> <path> --global`
+
+Source formats:
+- `github:owner/repo#sha`
+- `github:owner/repo` (auto-resolves latest SHA)
+- `owner/repo` (auto-normalized)
+
+Unlink local tool:
+`kazibee unlink <name>`
+`kazibee unlink <name> --global`
+
+Set env vars for a tool:
+`kazibee env <name> --set KEY=VALUE`
+`kazibee env <name> --set KEY1=VALUE1 KEY2=VALUE2`
+
+View masked env:
+`kazibee env <name>`
+
+Delete env:
+`kazibee env <name> --delete KEY`
+`kazibee env <name> --delete KEY1 KEY2`
+
+## Helpful commands
+
+- `kazibee info` -> installed tool details + masked env keys
+- `kazibee show` -> merged interface for all tools
+- `kazibee show <toolName>` -> interface for one tool
+- `kazibee llm` -> this guide
+- `kazibee llm <toolName>` -> tool-specific instructions
+- `kazibee spec` -> list built-in spec documents
+- `kazibee spec <SPEC_NAME>` -> print a specific built-in spec document
+
+## Tool command routing
+
+You can invoke plugin commands directly:
+`kazibee <tool-name> <subcommand>`
+
+Example:
+`kazibee gmail login`
+
+If the subcommand returns `{ KEY: "VALUE" }`, Kazibee stores those values as tool env vars automatically.
+
+## Safety and correctness rules
+
+- Prefer read/list actions first before create/delete/update.
+- Confirm target IDs/names before destructive operations.
+- For external changes (email send, delete, droplet create/delete), summarize planned action before execution.
+- If a method call fails, rerun `kazibee show <toolName>` and adjust to the exact signature.
