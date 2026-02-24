@@ -30,9 +30,20 @@ function extractFromDts(dtsContent: string): { supportingTypes: string; methods:
   return { supportingTypes, methods };
 }
 
-export async function toolShow(toolName?: string): Promise<void> {
+function extractMethodNames(methods: string): string[] {
+  const names: string[] = [];
+  const re = /^\s+(\w+)\s*\(/gm;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(methods)) !== null) {
+    names.push(match[1]);
+  }
+  return names;
+}
+
+export async function toolShow(toolName?: string, options?: { brief?: boolean }): Promise<void> {
   const directory = process.cwd();
   const db = new DatabaseService();
+  const brief = options?.brief ?? false;
 
   try {
     const tools = db.listTools(directory);
@@ -66,10 +77,15 @@ export async function toolShow(toolName?: string): Promise<void> {
       const result = extractFromDts(dtsContent);
       if (!result) continue;
 
-      if (result.supportingTypes) {
-        allTypes.push(result.supportingTypes);
+      if (brief) {
+        const methodNames = extractMethodNames(result.methods);
+        toolEntries.push(`  ${tool.name}: ${methodNames.join(', ')}`);
+      } else {
+        if (result.supportingTypes) {
+          allTypes.push(result.supportingTypes);
+        }
+        toolEntries.push(`  '${tool.name}': {${result.methods}\n  }`);
       }
-      toolEntries.push(`  '${tool.name}': {${result.methods}\n  }`);
     }
 
     if (toolEntries.length === 0) {
@@ -77,13 +93,16 @@ export async function toolShow(toolName?: string): Promise<void> {
       process.exit(1);
     }
 
-    const parts: string[] = [];
-    if (allTypes.length > 0) {
-      parts.push(allTypes.join('\n\n'));
+    if (brief) {
+      console.log(toolEntries.join('\n'));
+    } else {
+      const parts: string[] = [];
+      if (allTypes.length > 0) {
+        parts.push(allTypes.join('\n\n'));
+      }
+      parts.push(`interface ToolInterface {\n${toolEntries.join('\n')}\n}`);
+      console.log(parts.join('\n\n'));
     }
-    parts.push(`interface ToolInterface {\n${toolEntries.join('\n')}\n}`);
-
-    console.log(parts.join('\n\n'));
   } finally {
     db.close();
   }

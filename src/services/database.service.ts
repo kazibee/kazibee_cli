@@ -18,6 +18,7 @@ interface ToolInstallRow {
   sha: string;
   install_path: string;
   dts_path: string;
+  description: string;
   directory: string;
   installed_at: string;
 }
@@ -29,6 +30,7 @@ interface ToolLinkRow {
   sha: string;
   install_path: string;
   dts_path: string;
+  description: string;
   source_ref: string;
   directory: string;
   linked_at: string;
@@ -41,6 +43,7 @@ interface ResolvedToolQueryRow {
   sha: string;
   install_path: string;
   dts_path: string;
+  description: string;
   directory: string;
   source_type: ToolSourceType;
   source_ref: string;
@@ -56,6 +59,7 @@ export interface ResolvedToolRow {
   sha: string;
   install_path: string;
   dts_path: string;
+  description: string;
   directory: string;
   source_type: ToolSourceType;
   source_ref: string;
@@ -121,6 +125,7 @@ export class DatabaseService {
         sha TEXT NOT NULL,
         install_path TEXT NOT NULL,
         dts_path TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
         directory TEXT NOT NULL,
         installed_at TEXT NOT NULL DEFAULT (datetime('now')),
         PRIMARY KEY (name, directory)
@@ -133,6 +138,7 @@ export class DatabaseService {
         sha TEXT NOT NULL,
         install_path TEXT NOT NULL,
         dts_path TEXT NOT NULL,
+        description TEXT NOT NULL DEFAULT '',
         source_ref TEXT NOT NULL,
         directory TEXT NOT NULL,
         linked_at TEXT NOT NULL DEFAULT (datetime('now')),
@@ -161,6 +167,16 @@ export class DatabaseService {
         PRIMARY KEY (tool_name, owner, repo, sha, injected_key)
       );
     `);
+
+    // Add description column to existing tables (migration for pre-existing DBs)
+    const installCols = this.db.query<{ name: string }, []>('PRAGMA table_info(tool_installs)').all();
+    if (!installCols.some((c) => c.name === 'description')) {
+      this.db.exec(`ALTER TABLE tool_installs ADD COLUMN description TEXT NOT NULL DEFAULT ''`);
+    }
+    const linkCols = this.db.query<{ name: string }, []>('PRAGMA table_info(tool_links)').all();
+    if (!linkCols.some((c) => c.name === 'description')) {
+      this.db.exec(`ALTER TABLE tool_links ADD COLUMN description TEXT NOT NULL DEFAULT ''`);
+    }
 
     // Development compatibility: if local links were previously stored in
     // tool_installs using source_type/source_ref, move them to tool_links.
@@ -208,11 +224,12 @@ export class DatabaseService {
     installPath: string,
     dtsPath: string,
     directory: string,
+    description?: string,
   ): void {
     this.db.run(
-      `INSERT OR REPLACE INTO tool_installs (name, owner, repo, sha, install_path, dts_path, directory)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [name, owner, repo, sha, installPath, dtsPath, directory],
+      `INSERT OR REPLACE INTO tool_installs (name, owner, repo, sha, install_path, dts_path, description, directory)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, owner, repo, sha, installPath, dtsPath, description ?? '', directory],
     );
     logger.info(`Registered installed tool "${name}" for directory ${directory}`);
   }
@@ -226,12 +243,13 @@ export class DatabaseService {
     dtsPath: string,
     sourceRef: string,
     directory: string,
+    description?: string,
   ): void {
     this.db.run(
       `INSERT OR REPLACE INTO tool_links
-       (name, owner, repo, sha, install_path, dts_path, source_ref, directory)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [name, owner, repo, sha, installPath, dtsPath, sourceRef, directory],
+       (name, owner, repo, sha, install_path, dts_path, description, source_ref, directory)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [name, owner, repo, sha, installPath, dtsPath, description ?? '', sourceRef, directory],
     );
     logger.info(`Registered linked tool "${name}" for directory ${directory}`);
   }
@@ -329,6 +347,7 @@ export class DatabaseService {
          sha,
          install_path,
          dts_path,
+         description,
          directory,
          source_type,
          source_ref,
@@ -343,6 +362,7 @@ export class DatabaseService {
            sha,
            install_path,
            dts_path,
+           description,
            directory,
            'github' AS source_type,
            'github:' || owner || '/' || repo || '#' || sha AS source_ref,
@@ -361,6 +381,7 @@ export class DatabaseService {
            sha,
            install_path,
            dts_path,
+           description,
            directory,
            'local' AS source_type,
            source_ref,
@@ -387,6 +408,7 @@ export class DatabaseService {
         sha: row.sha,
         install_path: row.install_path,
         dts_path: row.dts_path,
+        description: row.description,
         directory: row.directory,
         source_type: row.source_type,
         source_ref: row.source_ref,
@@ -411,6 +433,7 @@ export class DatabaseService {
          sha,
          install_path,
          dts_path,
+         description,
          directory,
          'github' AS source_type,
          'github:' || owner || '/' || repo || '#' || sha AS source_ref,
@@ -431,6 +454,7 @@ export class DatabaseService {
          sha,
          install_path,
          dts_path,
+         description,
          directory,
          'local' AS source_type,
          source_ref,

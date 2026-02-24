@@ -77,6 +77,7 @@ async function main(): Promise<void> {
   program
     .command('show [toolName]')
     .description('Print the combined .d.ts interface for all tools or a specific tool')
+    .option('-b, --brief', 'Show only method names (no full signatures or types)')
     .action(toolShow);
 
   program

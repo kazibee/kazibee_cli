@@ -43,6 +43,23 @@ export class ToolService {
     this.db = db;
   }
 
+  private async readToolDescription(installPath: string): Promise<string> {
+    try {
+      const pkgFile = Bun.file(join(installPath, 'package.json'));
+      if (await pkgFile.exists()) {
+        const pkg = await pkgFile.json();
+        // Prefer kazibee.description, fall back to top-level description
+        const desc = pkg?.kazibee?.description ?? pkg?.description;
+        if (typeof desc === 'string' && desc.length > 0) {
+          return desc;
+        }
+      }
+    } catch {
+      logger.warn(`Could not read description from ${installPath}/package.json`);
+    }
+    return '';
+  }
+
   private async generateTypes(
     name: string,
     installPath: string,
@@ -84,6 +101,8 @@ export class ToolService {
 
     await this.generateTypes(name, tool.installPath, coreLogger);
 
+    const description = await this.readToolDescription(tool.installPath);
+
     // Register install in database
     this.db.addToolInstall(
       name,
@@ -93,6 +112,7 @@ export class ToolService {
       tool.installPath,
       tool.dtsPath,
       directory,
+      description,
     );
 
     if (result.skipped) {
@@ -109,6 +129,8 @@ export class ToolService {
 
     await this.generateTypes(name, localPath, coreLogger);
 
+    const description = await this.readToolDescription(localPath);
+
     this.db.addToolLink(
       name,
       source.owner,
@@ -118,6 +140,7 @@ export class ToolService {
       dtsPath,
       `local:${localPath}`,
       directory,
+      description,
     );
 
     logger.info(`Tool "${name}" linked from ${localPath} and registered for ${directory}`);
@@ -143,6 +166,7 @@ export class ToolService {
     sourceType: ToolSourceType;
     sourceRef: string;
     installPath: string;
+    description: string;
     directory: string;
   }> {
     return this.db.listTools(directory).map(row => ({
@@ -153,6 +177,7 @@ export class ToolService {
       sourceType: row.source_type,
       sourceRef: row.source_ref,
       installPath: row.install_path,
+      description: row.description,
       directory: row.directory,
     }));
   }

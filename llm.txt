@@ -5,19 +5,26 @@ You can write code and execute it through `kazibee exec`.
 
 ## Required startup flow (do this first)
 
-1. Discover installed tools:
+1. Discover installed tools and their descriptions:
 `kazibee list`
 
-2. Inspect available APIs:
-`kazibee show`
+That's it. Do NOT load all tool interfaces upfront.
+Load interfaces on demand as you need them (see below).
 
-3. For a single tool, inspect only that tool:
+## Progressive tool loading
+
+Only load a tool's interface when you are about to use it:
+
+- Load method signatures for a specific tool:
 `kazibee show <toolName>`
 
-4. Load plugin-specific instructions when needed:
+- If you just need method names (lightweight):
+`kazibee show --brief` or `kazibee show <toolName> --brief`
+
+- Load plugin-specific instructions when needed:
 `kazibee llm <toolName>`
 
-Do not assume methods. Always confirm method names/signatures from `kazibee show` first.
+Do not assume methods. Always confirm method names/signatures from `kazibee show` before calling a tool.
 
 ## How execution works
 
@@ -70,8 +77,9 @@ Delete env:
 ## Helpful commands
 
 - `kazibee info` -> installed tool details + masked env keys
-- `kazibee show` -> merged interface for all tools
+- `kazibee show` -> merged interface for all tools (use sparingly)
 - `kazibee show <toolName>` -> interface for one tool
+- `kazibee show --brief` -> method names only for all tools
 - `kazibee llm` -> this guide
 - `kazibee llm <toolName>` -> tool-specific instructions
 - `kazibee spec` -> list built-in spec documents

@@ -19,10 +19,10 @@ export async function toolList(): Promise<void> {
 
     console.log(`Tools for ${directory}:`);
     for (const tool of tools) {
-      const source = tool.sourceType === 'github'
-        ? `github:${tool.owner}/${tool.repo}#${tool.sha.slice(0, 8)}`
-        : tool.sourceRef;
-      console.log(`  ${tool.name} — ${source} (from ${tool.directory})`);
+      const desc = tool.description
+        ? ` — ${tool.description}`
+        : '';
+      console.log(`  ${tool.name}${desc}`);
     }
   } finally {
     db.close();
