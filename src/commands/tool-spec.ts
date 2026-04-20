@@ -1,12 +1,21 @@
 import linkSpec from '../../specs/LINK_SPEC.md' with { type: 'text' };
 import permissionsSpec from '../../specs/PERMISSIONS_SPEC.md' with { type: 'text' };
+import commandArgsSpec from '../../specs/COMMAND_ARGS_SPEC.md' with { type: 'text' };
+import contextSpec from '../../specs/CONTEXT_SPEC.md' with { type: 'text' };
 
 const SPEC_REGISTRY = {
   LINK_SPEC: linkSpec,
   PERMISSIONS_SPEC: permissionsSpec,
+  COMMAND_ARGS: commandArgsSpec,
+  CONTEXT_SPEC: contextSpec,
 } as const;
 
 type SpecName = keyof typeof SPEC_REGISTRY;
+
+const SPEC_ALIASES: Record<string, SpecName> = {
+  COMMAND_ARGS_SPEC: 'COMMAND_ARGS',
+  TOOL_COMMAND_ARGS_SPEC: 'COMMAND_ARGS',
+};
 
 function normalizeSpecName(input: string): string {
   return input.trim().toUpperCase().replace(/\.MD$/, '');
@@ -16,6 +25,10 @@ function resolveSpecName(input: string): SpecName | null {
   const normalized = normalizeSpecName(input);
   if (normalized in SPEC_REGISTRY) {
     return normalized as SpecName;
+  }
+  const aliased = SPEC_ALIASES[normalized];
+  if (aliased) {
+    return aliased;
   }
   return null;
 }

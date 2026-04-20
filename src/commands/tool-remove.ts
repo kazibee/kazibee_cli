@@ -1,13 +1,11 @@
-import { DatabaseService } from '../services/database.service.js';
-import { ToolService } from '../services/tool.service.js';
+import { createCliInstance } from '../create-instance.js';
 
 export async function toolRemove(name: string, options: { global?: boolean }): Promise<void> {
   const directory = options.global ? '/' : process.cwd();
-  const db = new DatabaseService();
+  const kazi = createCliInstance();
 
   try {
-    const toolService = new ToolService(db);
-    const { removed } = toolService.remove(name, directory);
+    const { removed } = kazi.tools.remove(name, directory);
 
     if (removed) {
       console.log(`Tool "${name}" removed from ${directory === '/' ? 'global' : directory}`);
@@ -16,6 +14,6 @@ export async function toolRemove(name: string, options: { global?: boolean }): P
       process.exit(1);
     }
   } finally {
-    db.close();
+    kazi.close();
   }
 }

@@ -1,13 +1,13 @@
 import { join } from 'path';
-import { DatabaseService } from '../services/database.service';
+import { readFileSync, existsSync } from 'fs';
+import { createCliInstance } from '../create-instance.js';
 import kazibeeLlm from '../../llm.txt';
 
-async function printLlmFile(path: string): Promise<void> {
-  const file = Bun.file(path);
-  if (!(await file.exists())) {
+function printLlmFile(path: string): void {
+  if (!existsSync(path)) {
     throw new Error(`llm.txt not found at ${path}`);
   }
-  const content = await file.text();
+  const content = readFileSync(path, 'utf-8');
   process.stdout.write(content);
   if (!content.endsWith('\n')) {
     process.stdout.write('\n');
@@ -15,28 +15,35 @@ async function printLlmFile(path: string): Promise<void> {
 }
 
 export async function toolLlm(toolName?: string): Promise<void> {
-  let db: DatabaseService | null = null;
+  if (!toolName) {
+    process.stdout.write(kazibeeLlm);
+    if (!kazibeeLlm.endsWith('\n')) {
+      process.stdout.write('\n');
+    }
+    return;
+  }
+
+  // Always print global guide first so critical rules (heredoc, incremental
+  // calls, API accuracy) are seen even when the LLM only reads tool-specific docs.
+  process.stdout.write(kazibeeLlm);
+  if (!kazibeeLlm.endsWith('\n')) {
+    process.stdout.write('\n');
+  }
+  process.stdout.write('\n---\n\n');
+
+  const kazi = createCliInstance();
 
   try {
-    if (!toolName) {
-      process.stdout.write(kazibeeLlm);
-      if (!kazibeeLlm.endsWith('\n')) {
-        process.stdout.write('\n');
-      }
-      return;
-    }
-
-    db = new DatabaseService();
-    const tool = db.getToolInstall(toolName, process.cwd());
+    const tool = kazi.db.getToolInstall(toolName, process.cwd());
     if (!tool) {
       console.error(`Tool "${toolName}" is not installed in this directory`);
       process.exit(1);
     }
-    await printLlmFile(join(tool.install_path, 'llm.txt'));
+    printLlmFile(join(tool.install_path, 'llm.txt'));
   } catch (err) {
     console.error(err instanceof Error ? err.message : String(err));
     process.exit(1);
   } finally {
-    db?.close();
+    kazi.close();
   }
 }

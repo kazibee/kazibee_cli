@@ -10,13 +10,14 @@
     "dev": "bun run src/index.ts",
     "build": "bun build src/index.ts --outfile=dist/index.js --target=bun",
     "build:compile": "bun build --compile src/index.ts --outfile=kazibee",
-    "link": "bun run build && bun install -g .",
+    "link": "bun run build && bun link",
     "test": "bun test",
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@bashly/core": "file:../bashly/core",
-    "@noego/ioc": "^0.0.11",
+    "@kazibee/core": "file:../kazibee_core",
+    "@clack/prompts": "^1.0.0",
+    "@noego/ioc": "^0.2.1",
     "@noego/logger": "^0.0.2",
     "commander": "^12.1.0",
     "reflect-metadata": "^0.2.2"

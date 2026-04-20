@@ -7,6 +7,7 @@ You can write code and execute it through `kazibee exec`.
 
 1. Discover installed tools:
 `kazibee list`
+Use each tool description to decide when/how to use that plugin.
 
 2. Inspect available APIs:
 `kazibee show`
@@ -26,31 +27,104 @@ Do not assume methods. Always confirm method names/signatures from `kazibee show
 `tools["<tool-name>"]`
 - Return structured JSON-friendly objects whenever possible.
 
-Examples:
+### Code Delivery Rule (CRITICAL)
+ALWAYS use a heredoc. NEVER write a temp file and pipe it, and NEVER use `echo '...' | kazibee exec`.
 
-Single-line:
-`echo 'const rows = await tools["google-sheets"].readRange("SHEET_ID", "A1:C5"); return rows;' | kazibee exec`
+### No HTML Entities Rule (CRITICAL)
+Commands are executed in a real shell (zsh/bash), NOT rendered in a browser.
+NEVER use HTML entities in commands. They cause immediate parse errors.
 
-Heredoc:
-`kazibee exec <<'EOF'`
-`const msgs = await tools["gmail"].listMessages("in:inbox", 5);`
-`return msgs;`
-`EOF`
+Forbidden entities and their plain-text replacements:
+- `&lt;`  → `<`
+- `&gt;`  → `>`
+- `&amp;` → `&`
+- `&quot;` → `"`
+- `&apos;` → `'`
+
+If your command contains `&lt;&lt;`, `&gt;`, `&quot;`, `&apos;`, or `&amp;` you MUST rewrite it with the raw characters before executing.
+
+**CORRECT — heredoc (no temp files, no quote issues):**
+```bash
+kazibee exec <<'EOF'
+const msgs = await tools["gmail"].listMessages("in:inbox", 5);
+return msgs;
+EOF
+```
+
+**WRONG — HTML-escaped heredoc (causes `zsh: parse error near ';&'`):**
+```bash
+kazibee exec &lt;&lt;'EOF'
+const data = await tools[&quot;gmail&quot;].listMessages(&quot;in:inbox&quot;, 5);
+return data;
+EOF
+```
+
+**WRONG — ALL of these create orphan files or break on quotes:**
+```bash
+# WRONG — writeFile + cat/redirect creates orphan files in the user's working directory
+writeFile("script.js", code)
+cat script.js | kazibee exec
+kazibee exec < script.js
+
+# WRONG — echo with single quotes breaks when code contains apostrophes/single quotes
+echo '...' | kazibee exec
+
+# WRONG — passing code as a CLI argument (stdin only)
+kazibee exec 'return 1;'
+```
+
+### Incremental Calls Rule (CRITICAL)
+Each `kazibee exec` call should do ONE logical step, not an entire multi-page workflow.
+Tool state (browser tabs, connections, sessions) persists between calls.
+Observe the result of each call, then decide the next one.
+
+**CORRECT — incremental steps across separate calls:**
+```bash
+# Call 1: Open page
+kazibee exec <<'EOF'
+await tools["chrome-browser"].open("https://example.com", { waitUntil: "domcontentloaded" });
+return "opened";
+EOF
+
+# Call 2: Interact (state persists from Call 1)
+kazibee exec <<'EOF'
+const btn = await tools["chrome-browser"].findByRole("button", { name: /search/i });
+if (btn) await tools["chrome-browser"].execute({ type: "click", selector: btn.selector });
+return btn ? "clicked" : "not found";
+EOF
+```
+
+**WRONG — monolithic script doing everything at once:**
+```bash
+# DO NOT write 100-line scripts that navigate multiple sites, handle all errors,
+# and do complex multi-step workflows in a single kazibee exec call.
+# If any step fails, you lose all context and have to start over.
+```
+
+### API Accuracy Rule (CRITICAL)
+Only call methods that exist on a tool. Do NOT invent methods.
+Always confirm method names/signatures from `kazibee show <toolName>` first.
+If a method call fails, rerun `kazibee show <toolName>` and adjust to the exact signature.
 
 ## Tool/env setup commands
 
 Install:
 `kazibee install <name> <source>`
 `kazibee install <name> <source> --global`
+`kazibee install <name> <source> --skip-permissions`
 
 Link local tool:
 `kazibee link <name> <path>`
 `kazibee link <name> <path> --global`
+`kazibee link <name> <path> --skip-permissions`
 
 Source formats:
 - `github:owner/repo#sha`
 - `github:owner/repo` (auto-resolves latest SHA)
 - `owner/repo` (auto-normalized)
+
+Permission prompt bypass:
+- `--skip-permissions` skips the interactive permission menu and leaves existing saved permission grants unchanged.
 
 Unlink local tool:
 `kazibee unlink <name>`
@@ -80,16 +154,24 @@ Delete env:
 ## Tool command routing
 
 You can invoke plugin commands directly:
-`kazibee <tool-name> <subcommand>`
+`kazibee <tool-name> <subcommand> [args...]`
 
 Example:
 `kazibee gmail login`
 
 If the subcommand returns `{ KEY: "VALUE" }`, Kazibee stores those values as tool env vars automatically.
 
+## Tool command output behavior
+
+- Kazibee does not automatically print arbitrary return values from `kazibee <tool-name> <subcommand>`.
+- For user-visible output, tool commands must write to stdout (for example with `console.log(...)`).
+- Return `Record<string, string>` only when you want env persistence behavior.
+
+Example:
+`export async function ping(...args: string[]) { const out = [1, 2, 3]; console.log(out); return out; }`
+
 ## Safety and correctness rules
 
 - Prefer read/list actions first before create/delete/update.
 - Confirm target IDs/names before destructive operations.
 - For external changes (email send, delete, droplet create/delete), summarize planned action before execution.
-- If a method call fails, rerun `kazibee show <toolName>` and adjust to the exact signature.

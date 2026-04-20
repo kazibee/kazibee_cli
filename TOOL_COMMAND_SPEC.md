@@ -30,6 +30,9 @@ kazibee exec                          # execute sandboxed code from stdin
 kazibee <tool-name> <subcommand> [args...]  # run a tool's own command
 ```
 
+Notes:
+- `kazibee install` and `kazibee link` support `--skip-permissions` to bypass interactive permission prompts.
+
 ## How It Works
 
 ### Tool-side contract
@@ -54,6 +57,8 @@ export async function logout(...args: string[]): Promise<void> { ... }
 If a command function returns a `Record<string, string>`, the CLI auto-stores each key/value pair as a tool env var via `DatabaseService.setEnv()`. This is what makes `kazibee google-sheets login` a single-step setup — the function returns `{ CLIENT_ID, CLIENT_SECRET, REFRESH_TOKEN }` and the CLI persists all three.
 
 If the function returns `void` / `undefined`, nothing is stored.
+
+Non-env return values are not automatically printed to users. Command implementations must write user-visible output to stdout (for example, `console.log(...)`).
 
 ## Implementation
 
@@ -80,6 +85,8 @@ Steps:
 5. **Call the function** — `const result = await module[subcommand](...args)`. All trailing CLI args are forwarded as strings.
 
 6. **Auto-store env vars** — If `result` is a non-null object with string values, iterate its entries and call `db.setEnv(toolName, key, value, cwd)` for each one. Log what was stored.
+
+7. **Output visibility** — Kazibee does not auto-print arbitrary `result` values from tool commands. Tool commands should print output explicitly for users.
 
 ### Changes to `src/index.ts`
 
@@ -198,7 +205,7 @@ export async function runToolCommand(
 | `src/index.ts` | Flatten `tool` subcommand group to top-level + add `command:*` handler |
 | `src/commands/tool-command.ts` | New file — the routing logic above |
 
-No changes to `DatabaseService`, `ToolService`, or `@bashly/core` needed.
+No changes to `DatabaseService`, `ToolService`, or `@kazibee/core` needed.
 
 ## Reference example
 

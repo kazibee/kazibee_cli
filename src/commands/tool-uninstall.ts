@@ -1,14 +1,13 @@
 import { rmSync } from 'fs';
-import { DatabaseService } from '../services/database.service.js';
-import { ToolService } from '../services/tool.service.js';
+import { createCliInstance } from '../create-instance.js';
 
 export async function toolUninstall(name: string, options: { global?: boolean }): Promise<void> {
   const directory = options.global ? '/' : process.cwd();
-  const db = new DatabaseService();
+  const kazi = createCliInstance();
 
   try {
-    const linked = db.getLinkedToolAtDirectory(name, directory);
-    const installed = db.getInstalledToolAtDirectory(name, directory);
+    const linked = kazi.db.getLinkedToolAtDirectory(name, directory);
+    const installed = kazi.db.getInstalledToolAtDirectory(name, directory);
     if (linked) {
       console.error(`Tool "${name}" is linked. Use "kazibee unlink ${name}"`);
       process.exit(1);
@@ -18,8 +17,7 @@ export async function toolUninstall(name: string, options: { global?: boolean })
       process.exit(1);
     }
 
-    const toolService = new ToolService(db);
-    const { removed, installPath, orphaned } = toolService.uninstall(name, directory);
+    const { removed, installPath, orphaned } = kazi.tools.uninstall(name, directory);
 
     if (!removed) {
       console.error(`Tool "${name}" not found in ${directory === '/' ? 'global' : directory}`);
@@ -33,6 +31,6 @@ export async function toolUninstall(name: string, options: { global?: boolean })
       console.log(`Tool "${name}" uninstalled from ${directory === '/' ? 'global' : directory}`);
     }
   } finally {
-    db.close();
+    kazi.close();
   }
 }

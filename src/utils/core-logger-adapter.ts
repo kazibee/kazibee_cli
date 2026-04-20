@@ -1,8 +1,8 @@
 import { getLogger } from '@noego/logger';
-import type { ILogger } from '@bashly/core';
+import type { ILogger } from '@kazibee/core';
 
 /**
- * Bridges @noego/logger (sync) to @bashly/core's ILogger (async).
+ * Bridges @noego/logger (sync) to @kazibee/core's ILogger (async).
  * Core expects ILogger methods to return Promise<void>, but @noego/logger
  * methods are synchronous. This adapter wraps the sync calls to satisfy
  * the async interface.

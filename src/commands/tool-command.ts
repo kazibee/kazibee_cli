@@ -1,6 +1,7 @@
 import { join } from 'path';
+import { readFileSync } from 'fs';
 import { getLogger } from '@noego/logger';
-import { DatabaseService } from '../services/database.service.js';
+import { createCliInstance } from '../create-instance.js';
 
 const logger = getLogger('kazibee:cmd:tool-command');
 
@@ -10,25 +11,25 @@ export async function runToolCommand(
   args: string[],
   directory: string,
 ): Promise<void> {
-  const db = new DatabaseService();
+  const kazi = createCliInstance();
 
   try {
     // 1. Look up tool
-    const tool = db.getToolInstall(toolName, directory);
+    const tool = kazi.db.getToolInstall(toolName, directory);
     if (!tool) {
       throw new Error(`Tool "${toolName}" is not installed in this directory`);
     }
 
-    // 2. Read package.json → command field
+    // 2. Read package.json -> command field
     const pkgPath = join(tool.install_path, 'package.json');
-    const pkg = await Bun.file(pkgPath).json();
+    const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8')) as Record<string, unknown>;
     const commandEntry = pkg.command;
     if (!commandEntry) {
       throw new Error(`Tool "${toolName}" does not expose any commands`);
     }
 
     // 3. Import command module
-    const commandPath = join(tool.install_path, commandEntry);
+    const commandPath = join(tool.install_path, commandEntry as string);
     const mod = await import(commandPath);
 
     // 4. Resolve subcommand
@@ -46,9 +47,13 @@ export async function runToolCommand(
       );
     }
 
-    // 5. Call it with all trailing CLI args
-    // Existing zero-arg commands remain compatible because extra JS args are ignored.
-    const result = await fn(...args);
+    // 5. Resolve env (SYSTEM -> GLOBAL -> LOCAL priority) and call command
+    const systemEnv = kazi.db.getSetupEnv(toolName, tool.owner, tool.repo);
+    const globalEnv = kazi.db.getGlobalEnv(toolName);
+    const localEnv = kazi.db.getLocalEnv(toolName, tool.directory);
+    const env = { ...systemEnv, ...globalEnv, ...localEnv };
+
+    const result = await fn(env, ...args);
 
     // 6. Auto-store env vars if result is Record<string, string>
     //    Store against the tool's registered directory so env vars are found
@@ -56,13 +61,13 @@ export async function runToolCommand(
     if (result && typeof result === 'object' && !Array.isArray(result)) {
       for (const [key, value] of Object.entries(result)) {
         if (typeof value === 'string') {
-          db.setEnv(toolName, key, value, tool.directory);
+          kazi.db.setEnv(toolName, key, value, tool.directory);
         }
       }
       const keys = Object.keys(result).filter(k => typeof result[k] === 'string');
       console.log(`Stored env vars for "${toolName}": ${keys.join(', ')}`);
     }
   } finally {
-    db.close();
+    kazi.close();
   }
 }

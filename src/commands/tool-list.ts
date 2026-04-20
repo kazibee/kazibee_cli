@@ -1,30 +1,41 @@
-import { getLogger } from '@noego/logger';
-import { DatabaseService } from '../services/database.service.js';
-import { ToolService } from '../services/tool.service.js';
+import { createCliInstance } from '../create-instance.js';
 
-const logger = getLogger('kazibee:cmd:tool-list');
+interface ToolListOptions {
+  all?: boolean;
+}
 
-export async function toolList(): Promise<void> {
+export async function toolList(options: ToolListOptions = {}): Promise<void> {
   const directory = process.cwd();
-  const db = new DatabaseService();
+  const kazi = createCliInstance();
 
   try {
-    const toolService = new ToolService(db);
-    const tools = toolService.list(directory);
+    const tools = options.all
+      ? await kazi.tools.listAll()
+      : await kazi.tools.list(directory);
 
     if (tools.length === 0) {
-      console.log('No tools installed for this directory.');
+      if (options.all) {
+        console.log('No tools registered.');
+      } else {
+        console.log('No tools installed for this directory.');
+      }
       return;
     }
 
-    console.log(`Tools for ${directory}:`);
+    if (options.all) {
+      console.log('All registered tools:');
+    } else {
+      console.log(`Tools for ${directory}:`);
+    }
     for (const tool of tools) {
       const source = tool.sourceType === 'github'
         ? `github:${tool.owner}/${tool.repo}#${tool.sha.slice(0, 8)}`
         : tool.sourceRef;
-      console.log(`  ${tool.name} — ${source} (from ${tool.directory})`);
+      const description = tool.description ?? '(no package description)';
+      console.log(`  ${tool.name} — ${description}`);
+      console.log(`    Source: ${source} (from ${tool.directory})`);
     }
   } finally {
-    db.close();
+    kazi.close();
   }
 }

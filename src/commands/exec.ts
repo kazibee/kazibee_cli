@@ -1,8 +1,18 @@
 import { getLogger } from '@noego/logger';
-import { DatabaseService } from '../services/database.service.js';
-import { ExecService } from '../services/exec.service.js';
+import { createCliInstance } from '../create-instance.js';
 
 const logger = getLogger('kazibee:cmd:exec');
+
+const EXEC_USAGE = `kazibee exec reads JavaScript from stdin. File path arguments are NOT supported.
+
+Usage:
+
+  kazibee exec <<'EOF'
+  const result = await tools["chrome-browser"].navigate("https://example.com");
+  return result;
+  EOF
+
+  echo 'return await tools["gmail"].send({to: "a@b.com", subject: "hi"})' | kazibee exec`;
 
 export async function exec(): Promise<void> {
   const directory = process.cwd();
@@ -15,15 +25,14 @@ export async function exec(): Promise<void> {
   const code = Buffer.concat(chunks).toString('utf-8').trim();
 
   if (!code) {
-    console.error('No code provided on stdin');
+    console.error(`No code provided on stdin.\n\n${EXEC_USAGE}`);
     process.exit(1);
   }
 
-  const db = new DatabaseService();
+  const kazi = createCliInstance();
 
   try {
-    const execService = new ExecService(db);
-    const result = await execService.execute(code, directory);
+    const result = await kazi.exec.execute(code, directory);
 
     if (result.success) {
       if (result.result !== undefined) {
@@ -35,6 +44,6 @@ export async function exec(): Promise<void> {
       process.exit(1);
     }
   } finally {
-    db.close();
+    kazi.close();
   }
 }

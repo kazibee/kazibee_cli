@@ -1,16 +1,11 @@
-import { getLogger } from '@noego/logger';
-import { DatabaseService } from '../services/database.service.js';
-import { ToolService } from '../services/tool.service.js';
-
-const logger = getLogger('kazibee:cmd:tool-info');
+import { createCliInstance } from '../create-instance.js';
 
 export async function toolInfo(): Promise<void> {
   const directory = process.cwd();
-  const db = new DatabaseService();
+  const kazi = createCliInstance();
 
   try {
-    const toolService = new ToolService(db);
-    const tools = toolService.info(directory);
+    const tools = kazi.tools.info(directory);
 
     if (tools.length === 0) {
       console.log('No tools installed for this directory.');
@@ -33,6 +28,6 @@ export async function toolInfo(): Promise<void> {
       }
     }
   } finally {
-    db.close();
+    kazi.close();
   }
 }

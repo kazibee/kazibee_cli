@@ -13,29 +13,42 @@ import { toolList } from './commands/tool-list.js';
 import { toolInfo } from './commands/tool-info.js';
 import { toolEnv } from './commands/tool-env.js';
 import { toolShow } from './commands/tool-show.js';
-import { toolLlm } from './commands/tool-llm';
-import { toolSpec } from './commands/tool-spec';
+import { toolLlm } from './commands/tool-llm.js';
+import { toolSpec } from './commands/tool-spec.js';
 import { exec } from './commands/exec.js';
 import { runToolCommand } from './commands/tool-command.js';
+import { usage } from './commands/usage.js';
+import { log } from './commands/log.js';
 
 async function main(): Promise<void> {
   const program = new Command();
 
   program
     .name('kazibee')
-    .description('kazibee - tool management and sandboxed execution CLI')
+    .description(
+      'kazibee - tool management and sandboxed execution CLI\n\n' +
+      'IMPORTANT: Before using any tool, read its documentation first:\n' +
+      '  kazibee llm              Read the llm.txt for the current project\n' +
+      '  kazibee llm <toolName>   Read the llm.txt for a specific tool\n' +
+      '  kazibee show             Print the .d.ts interface for all tools\n' +
+      '  kazibee show <toolName>  Print the .d.ts interface for a specific tool\n\n' +
+      'Always run "kazibee llm <tool>" and "kazibee show <tool>" before working\n' +
+      'with a tool to understand its API, types, capabilities, and usage patterns.'
+    )
     .version('0.1.0');
 
   program
     .command('install <name> <source>')
     .description('Install a tool from GitHub (source: github:owner/repo#sha)')
     .option('-g, --global', 'Install globally (available in all directories)')
+    .option('--skip-permissions', 'Skip interactive permission prompts and keep existing permission grants unchanged')
     .action(toolInstall);
 
   program
     .command('link <name> <path>')
     .description('Link a local tool directory for development')
     .option('-g, --global', 'Link globally (available in all directories)')
+    .option('--skip-permissions', 'Skip interactive permission prompts and keep existing permission grants unchanged')
     .action(toolLink);
 
   program
@@ -59,6 +72,7 @@ async function main(): Promise<void> {
   program
     .command('list')
     .description('List tools available in the current directory')
+    .option('-a, --all', 'List all registered tools across all directories')
     .action(toolList);
 
   program
@@ -69,9 +83,8 @@ async function main(): Promise<void> {
   program
     .command('env <name>')
     .description('Manage environment variables for a tool')
-    .option('--set <pairs...>', 'Set env vars (KEY=VALUE)')
-    .option('--delete <keys...>', 'Delete env vars')
     .option('-g, --global', 'Manage env vars in global scope')
+    .argument('[pairs...]', 'Env entries as KEY=VALUE; use KEY= to delete')
     .action(toolEnv);
 
   program
@@ -91,8 +104,29 @@ async function main(): Promise<void> {
 
   program
     .command('exec')
-    .description('Execute code from stdin in a sandbox with available tools')
+    .description(
+      'Execute code from stdin in a sandbox with available tools\n\n' +
+      'Code must be piped via stdin — file path arguments are not supported.\n\n' +
+      'Examples:\n' +
+      "  kazibee exec <<'EOF'\n" +
+      '  const result = await tools["chrome-browser"].navigate("https://example.com");\n' +
+      '  return result;\n' +
+      '  EOF\n\n' +
+      '  echo \'return await tools["gmail"].send({to: "a@b.com", subject: "hi"})\' | kazibee exec'
+    )
     .action(exec);
+
+  program
+    .command('log')
+    .description('Show the current log file path')
+    .option('--file', 'Print the log file path')
+    .action(log);
+
+  program
+    .command('usage [target]')
+    .description('Print tool usage documentation, optionally formatted for an agent platform (claude, codex)')
+    .option('--install', 'Write the skill file to the target platform directory')
+    .action(usage);
 
   // Route unknown commands to tool-command handler before Commander parses.
   // Commander's command:* event doesn't fire when registered commands exist —

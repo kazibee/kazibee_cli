@@ -1,4 +1,6 @@
-import { DatabaseService } from '../services/database.service.js';
+import { readFileSync, existsSync } from 'fs';
+import type { ResolvedToolRow } from '@kazibee/core';
+import { createCliInstance } from '../create-instance.js';
 
 function extractFromDts(dtsContent: string): { supportingTypes: string; methods: string } | null {
   const mainIdx = dtsContent.indexOf('declare function main(');
@@ -32,10 +34,10 @@ function extractFromDts(dtsContent: string): { supportingTypes: string; methods:
 
 export async function toolShow(toolName?: string): Promise<void> {
   const directory = process.cwd();
-  const db = new DatabaseService();
+  const kazi = createCliInstance();
 
   try {
-    const tools = db.listTools(directory);
+    const tools = kazi.db.listTools(directory);
 
     if (tools.length === 0) {
       console.error('No tools installed for this directory.');
@@ -56,13 +58,12 @@ export async function toolShow(toolName?: string): Promise<void> {
     const toolEntries: string[] = [];
 
     for (const tool of selectedTools) {
-      const dtsFile = Bun.file(tool.dts_path);
-      if (!(await dtsFile.exists())) {
+      if (!existsSync(tool.dts_path)) {
         console.error(`No types found for "${tool.name}" (${tool.dts_path})`);
         continue;
       }
 
-      const dtsContent = await dtsFile.text();
+      const dtsContent = readFileSync(tool.dts_path, 'utf-8');
       const result = extractFromDts(dtsContent);
       if (!result) continue;
 
@@ -85,6 +86,6 @@ export async function toolShow(toolName?: string): Promise<void> {
 
     console.log(parts.join('\n\n'));
   } finally {
-    db.close();
+    kazi.close();
   }
 }
