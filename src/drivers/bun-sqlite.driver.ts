@@ -1,8 +1,17 @@
 import { Database } from 'bun:sqlite';
 import type { IDatabaseDriver, IStatement, RunResult } from '@kazibee/core';
 
+const BUSY_TIMEOUT_MS = 5000;
+
 export function createBunSqliteDriver(path: string): IDatabaseDriver {
   const db = new Database(path);
+
+  // The Kazibee DB is shared by multiple short-lived CLI processes. Use WAL mode
+  // for better writer/read concurrency and let SQLite wait briefly for locks
+  // instead of failing immediately with SQLITE_BUSY / SQLITE_BUSY_RECOVERY.
+  db.exec(`PRAGMA journal_mode = WAL;`);
+  db.exec(`PRAGMA synchronous = NORMAL;`);
+  db.exec(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS};`);
 
   return {
     exec(sql: string): void {

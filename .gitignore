@@ -16,3 +16,4 @@ kazibee
 .env
 .env.*
 !.env.example
+scripts/install.sh
