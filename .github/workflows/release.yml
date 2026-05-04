@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    branches:
+      - release
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and release
+    runs-on: [self-hosted, macOS, ARM64, simona]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Trust GitHub SSH host
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type check
+        run: bun run lint
+
+      - name: Build bundled package
+        run: bun run build
+
+      - name: Resolve release version
+        run: |
+          VERSION="$(bun -e "console.log(require('./package.json').version)")"
+          RELEASE_NAME="v${VERSION}"
+
+          echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+          echo "RELEASE_NAME=${RELEASE_NAME}" >> "${GITHUB_ENV}"
+
+      - name: Build release binaries
+        run: |
+          mkdir -p release/bin
+
+          bun build --compile --target=bun-darwin-arm64 src/index.ts --outfile release/bin/kazibee-macos-arm64
+          bun build --compile --target=bun-darwin-x64 src/index.ts --outfile release/bin/kazibee-macos-x64
+          bun build --compile --target=bun-linux-arm64 src/index.ts --outfile release/bin/kazibee-linux-arm64
+          bun build --compile --target=bun-linux-x64 src/index.ts --outfile release/bin/kazibee-linux-x64
+          bun build --compile --target=bun-windows-x64 src/index.ts --outfile release/bin/kazibee-windows-x64.exe
+
+          chmod +x release/bin/kazibee-macos-arm64
+          chmod +x release/bin/kazibee-macos-x64
+          chmod +x release/bin/kazibee-linux-arm64
+          chmod +x release/bin/kazibee-linux-x64
+
+      - name: Smoke test native macOS binary
+        run: |
+          case "$(uname -m)" in
+            arm64) release/bin/kazibee-macos-arm64 --help ;;
+            x86_64) release/bin/kazibee-macos-x64 --help ;;
+            *) echo "Unsupported macOS architecture: $(uname -m)" && exit 1 ;;
+          esac
+
+      - name: Package release assets
+        run: |
+          mkdir -p release/assets
+
+          tar -czf "release/assets/kazibee-macos-arm64-${RELEASE_NAME}.tar.gz" -C release/bin kazibee-macos-arm64
+          tar -czf "release/assets/kazibee-macos-x64-${RELEASE_NAME}.tar.gz" -C release/bin kazibee-macos-x64
+          tar -czf "release/assets/kazibee-linux-arm64-${RELEASE_NAME}.tar.gz" -C release/bin kazibee-linux-arm64
+          tar -czf "release/assets/kazibee-linux-x64-${RELEASE_NAME}.tar.gz" -C release/bin kazibee-linux-x64
+          zip -j "release/assets/kazibee-windows-x64-${RELEASE_NAME}.zip" release/bin/kazibee-windows-x64.exe
+
+          shasum -a 256 release/assets/* > release/assets/SHA256SUMS
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${RELEASE_NAME}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_NAME}" release/assets/* --clobber
+          else
+            gh release create "${RELEASE_NAME}" release/assets/* \
+              --target "${GITHUB_SHA}" \
+              --title "kazibee ${RELEASE_NAME}" \
+              --notes "Automated kazibee ${RELEASE_NAME} release from branch ${GITHUB_REF_NAME} at ${GITHUB_SHA}."
+          fi

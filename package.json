@@ -15,7 +15,7 @@
     "lint": "tsc --noEmit"
   },
   "dependencies": {
-    "@kazibee/core": "file:../kazibee_core",
+    "@kazibee/core": "git+ssh://git@github.com/kazibee/kazibee-core.git#v0.1.0",
     "@clack/prompts": "^1.0.0",
     "@noego/ioc": "^0.2.1",
     "@noego/logger": "^0.0.2",
