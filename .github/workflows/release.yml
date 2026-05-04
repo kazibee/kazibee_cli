@@ -68,6 +68,7 @@ jobs:
       - name: Package release assets
         run: |
           mkdir -p release/assets
+          mkdir -p release/latest
 
           tar -czf "release/assets/kazibee-macos-arm64-${RELEASE_NAME}.tar.gz" -C release/bin kazibee-macos-arm64
           tar -czf "release/assets/kazibee-macos-x64-${RELEASE_NAME}.tar.gz" -C release/bin kazibee-macos-x64
@@ -76,6 +77,13 @@ jobs:
           zip -j "release/assets/kazibee-windows-x64-${RELEASE_NAME}.zip" release/bin/kazibee-windows-x64.exe
 
           shasum -a 256 release/assets/* > release/assets/SHA256SUMS
+
+          cp "release/assets/kazibee-macos-arm64-${RELEASE_NAME}.tar.gz" release/latest/kazibee-macos-arm64.tar.gz
+          cp "release/assets/kazibee-macos-x64-${RELEASE_NAME}.tar.gz" release/latest/kazibee-macos-x64.tar.gz
+          cp "release/assets/kazibee-linux-arm64-${RELEASE_NAME}.tar.gz" release/latest/kazibee-linux-arm64.tar.gz
+          cp "release/assets/kazibee-linux-x64-${RELEASE_NAME}.tar.gz" release/latest/kazibee-linux-x64.tar.gz
+          cp "release/assets/kazibee-windows-x64-${RELEASE_NAME}.zip" release/latest/kazibee-windows-x64.zip
+          cp release/assets/SHA256SUMS release/latest/SHA256SUMS
 
       - name: Publish GitHub release
         env:
@@ -89,3 +97,22 @@ jobs:
               --title "kazibee ${RELEASE_NAME}" \
               --notes "Automated kazibee ${RELEASE_NAME} release from branch ${GITHUB_REF_NAME} at ${GITHUB_SHA}."
           fi
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Upload release assets to S3
+        env:
+          KAZIBEE_RELEASE_BUCKET: ${{ vars.KAZIBEE_RELEASE_BUCKET }}
+        run: |
+          aws --version
+
+          aws s3 sync release/assets "s3://${KAZIBEE_RELEASE_BUCKET}/cli/${RELEASE_NAME}/" \
+            --only-show-errors
+
+          aws s3 sync release/latest "s3://${KAZIBEE_RELEASE_BUCKET}/cli/latest/" \
+            --only-show-errors
