@@ -1,6 +1,7 @@
 import { createCliInstance } from '../create-instance.js';
+import { type JsonOption, runCliCommand } from '../utils/cli-output.js';
 
-interface ToolListOptions {
+interface ToolListOptions extends JsonOption {
   all?: boolean;
 }
 
@@ -9,32 +10,32 @@ export async function toolList(options: ToolListOptions = {}): Promise<void> {
   const kazi = createCliInstance();
 
   try {
-    const tools = options.all
-      ? await kazi.tools.listAll()
-      : await kazi.tools.list(directory);
+    await runCliCommand(
+      options,
+      async () => ({
+        directory,
+        all: options.all === true,
+        tools: options.all
+          ? await kazi.tools.listAll()
+          : await kazi.tools.list(directory),
+      }),
+      ({ all, tools }) => {
+        if (tools.length === 0) {
+          console.log(all ? 'No tools registered.' : 'No tools installed for this directory.');
+          return;
+        }
 
-    if (tools.length === 0) {
-      if (options.all) {
-        console.log('No tools registered.');
-      } else {
-        console.log('No tools installed for this directory.');
-      }
-      return;
-    }
-
-    if (options.all) {
-      console.log('All registered tools:');
-    } else {
-      console.log(`Tools for ${directory}:`);
-    }
-    for (const tool of tools) {
-      const source = tool.sourceType === 'github'
-        ? `github:${tool.owner}/${tool.repo}#${tool.sha.slice(0, 8)}`
-        : tool.sourceRef;
-      const description = tool.description ?? '(no package description)';
-      console.log(`  ${tool.name} — ${description}`);
-      console.log(`    Source: ${source} (from ${tool.directory})`);
-    }
+        console.log(all ? 'All registered tools:' : `Tools for ${directory}:`);
+        for (const tool of tools) {
+          const source = tool.sourceType === 'github'
+            ? `github:${tool.owner}/${tool.repo}#${tool.sha.slice(0, 8)}`
+            : tool.sourceRef;
+          const description = tool.description ?? '(no package description)';
+          console.log(`  ${tool.name} — ${description}`);
+          console.log(`    Source: ${source} (from ${tool.directory})`);
+        }
+      },
+    );
   } finally {
     kazi.close();
   }

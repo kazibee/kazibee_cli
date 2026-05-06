@@ -1,6 +1,6 @@
 import { readFileSync, existsSync } from 'fs';
-import type { ResolvedToolRow } from '@kazibee/core';
 import { createCliInstance } from '../create-instance.js';
+import { CliCommandError, type JsonOption, runCliCommand } from '../utils/cli-output.js';
 
 function extractFromDts(dtsContent: string): { supportingTypes: string; methods: string } | null {
   const mainIdx = dtsContent.indexOf('declare function main(');
@@ -32,59 +32,77 @@ function extractFromDts(dtsContent: string): { supportingTypes: string; methods:
   return { supportingTypes, methods };
 }
 
-export async function toolShow(toolName?: string): Promise<void> {
+export async function toolShow(toolName?: string, options: JsonOption = {}): Promise<void> {
   const directory = process.cwd();
   const kazi = createCliInstance();
 
   try {
-    const tools = kazi.db.listTools(directory);
+    await runCliCommand(
+      options,
+      () => {
+        const tools = kazi.db.listTools(directory);
 
-    if (tools.length === 0) {
-      console.error('No tools installed for this directory.');
-      process.exit(1);
-    }
+        if (tools.length === 0) {
+          throw new CliCommandError('NO_TOOLS', 'No tools installed for this directory.');
+        }
 
-    const selectedTools = toolName
-      ? tools.filter(tool => tool.name === toolName)
-      : tools;
+        const selectedTools = toolName
+          ? tools.filter(tool => tool.name === toolName)
+          : tools;
 
-    if (toolName && selectedTools.length === 0) {
-      const available = tools.map(tool => tool.name).join(', ');
-      console.error(`Tool "${toolName}" is not installed in this directory. Available: ${available}`);
-      process.exit(1);
-    }
+        if (toolName && selectedTools.length === 0) {
+          const available = tools.map(tool => tool.name);
+          throw new CliCommandError(
+            'TOOL_NOT_INSTALLED',
+            `Tool "${toolName}" is not installed in this directory. Available: ${available.join(', ')}`,
+            { available },
+          );
+        }
 
-    const allTypes: string[] = [];
-    const toolEntries: string[] = [];
+        const allTypes: string[] = [];
+        const toolEntries: string[] = [];
+        const missingTypes: Array<{ toolName: string; dtsPath: string }> = [];
 
-    for (const tool of selectedTools) {
-      if (!existsSync(tool.dts_path)) {
-        console.error(`No types found for "${tool.name}" (${tool.dts_path})`);
-        continue;
-      }
+        for (const tool of selectedTools) {
+          if (!existsSync(tool.dts_path)) {
+            missingTypes.push({ toolName: tool.name, dtsPath: tool.dts_path });
+            continue;
+          }
 
-      const dtsContent = readFileSync(tool.dts_path, 'utf-8');
-      const result = extractFromDts(dtsContent);
-      if (!result) continue;
+          const dtsContent = readFileSync(tool.dts_path, 'utf-8');
+          const result = extractFromDts(dtsContent);
+          if (!result) continue;
 
-      if (result.supportingTypes) {
-        allTypes.push(result.supportingTypes);
-      }
-      toolEntries.push(`  '${tool.name}': {${result.methods}\n  }`);
-    }
+          if (result.supportingTypes) {
+            allTypes.push(result.supportingTypes);
+          }
+          toolEntries.push(`  '${tool.name}': {${result.methods}\n  }`);
+        }
 
-    if (toolEntries.length === 0) {
-      console.error('No tool interfaces generated.');
-      process.exit(1);
-    }
+        if (toolEntries.length === 0) {
+          throw new CliCommandError('NO_TOOL_INTERFACES', 'No tool interfaces generated.', { missingTypes });
+        }
 
-    const parts: string[] = [];
-    if (allTypes.length > 0) {
-      parts.push(allTypes.join('\n\n'));
-    }
-    parts.push(`interface ToolInterface {\n${toolEntries.join('\n')}\n}`);
+        const parts: string[] = [];
+        if (allTypes.length > 0) {
+          parts.push(allTypes.join('\n\n'));
+        }
+        parts.push(`interface ToolInterface {\n${toolEntries.join('\n')}\n}`);
 
-    console.log(parts.join('\n\n'));
+        return {
+          directory,
+          toolName: toolName ?? null,
+          content: parts.join('\n\n'),
+          missingTypes,
+        };
+      },
+      ({ content, missingTypes }) => {
+        for (const item of missingTypes) {
+          console.error(`No types found for "${item.toolName}" (${item.dtsPath})`);
+        }
+        console.log(content);
+      },
+    );
   } finally {
     kazi.close();
   }

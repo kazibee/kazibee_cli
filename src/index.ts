@@ -42,6 +42,7 @@ async function main(): Promise<void> {
     .description('Install a tool from GitHub (source: github:owner/repo#sha)')
     .option('-g, --global', 'Install globally (available in all directories)')
     .option('--skip-permissions', 'Skip interactive permission prompts and keep existing permission grants unchanged')
+    .option('--json', 'Print machine-readable JSON output')
     .action(toolInstall);
 
   program
@@ -49,52 +50,61 @@ async function main(): Promise<void> {
     .description('Link a local tool directory for development')
     .option('-g, --global', 'Link globally (available in all directories)')
     .option('--skip-permissions', 'Skip interactive permission prompts and keep existing permission grants unchanged')
+    .option('--json', 'Print machine-readable JSON output')
     .action(toolLink);
 
   program
     .command('remove <name>')
     .description('Remove a tool registration (keeps files)')
     .option('-g, --global', 'Remove from global scope')
+    .option('--json', 'Print machine-readable JSON output')
     .action(toolRemove);
 
   program
     .command('unlink <name>')
     .description('Unlink a local tool registration')
     .option('-g, --global', 'Unlink from global scope')
+    .option('--json', 'Print machine-readable JSON output')
     .action(toolUnlink);
 
   program
     .command('uninstall <name>')
     .description('Uninstall a GitHub-installed tool (removes registration and files)')
     .option('-g, --global', 'Uninstall from global scope')
+    .option('--json', 'Print machine-readable JSON output')
     .action(toolUninstall);
 
   program
     .command('list')
     .description('List tools available in the current directory')
     .option('-a, --all', 'List all registered tools across all directories')
+    .option('--json', 'Print machine-readable JSON output')
     .action(toolList);
 
   program
     .command('info')
     .description('Show detailed info for all tools in the current directory')
+    .option('--json', 'Print machine-readable JSON output')
     .action(toolInfo);
 
   program
     .command('env <name>')
     .description('Manage environment variables for a tool')
     .option('-g, --global', 'Manage env vars in global scope')
+    .option('--json', 'Print machine-readable JSON output')
     .argument('[pairs...]', 'Env entries as KEY=VALUE; use KEY= to delete')
     .action(toolEnv);
 
   program
     .command('show [toolName]')
     .description('Print the combined .d.ts interface for all tools or a specific tool')
+    .option('--json', 'Print machine-readable JSON output')
     .action(toolShow);
 
   program
     .command('llm [toolName]')
     .description('Print llm.txt from the current repo or from an installed tool')
+    .option('--json', 'Print machine-readable JSON output')
     .action(toolLlm);
 
   program
