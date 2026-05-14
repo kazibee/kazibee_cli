@@ -1,16 +1,32 @@
 import { createCliInstance } from '../create-instance.js';
 import { CliCommandError, type JsonOption, maskValue, runCliCommand } from '../utils/cli-output.js';
 
+interface EnvScopeOutput {
+  directory: string;
+  global: boolean;
+  env: Record<string, string>;
+}
+
+interface EnvOutput {
+  toolName: string;
+  directory: string | null;
+  global: boolean;
+  all: boolean;
+  env: Record<string, string>;
+  scopes: EnvScopeOutput[];
+  changes: Array<{ action: 'set' | 'delete'; key: string; deleted?: boolean }>;
+}
+
 export async function toolEnv(
   name: string,
   pairs: string[] = [],
-  options: { global?: boolean } & JsonOption = {},
+  options: { global?: boolean; all?: boolean } & JsonOption = {},
 ): Promise<void> {
   const directory = options.global ? '/' : process.cwd();
   const kazi = createCliInstance();
 
   try {
-    await runCliCommand(
+    await runCliCommand<EnvOutput>(
       options,
       () => {
         const changes: Array<{ action: 'set' | 'delete'; key: string; deleted?: boolean }> = [];
@@ -33,16 +49,40 @@ export async function toolEnv(
           changes.push({ action: 'set', key });
         }
 
+        if (options.all === true) {
+          const scopes = kazi.tools.getEnvScopes(name).map((scope) => ({
+            directory: scope.directory,
+            global: scope.directory === '/',
+            env: maskEnv(scope.env),
+          }));
+          return {
+            toolName: name,
+            directory: null,
+            global: false,
+            all: true,
+            env: {},
+            scopes,
+            changes,
+          } satisfies EnvOutput;
+        }
+
         const env = kazi.tools.getEnvAtDirectory(name, directory);
         return {
           toolName: name,
           directory,
           global: options.global === true,
-          env: Object.fromEntries(Object.entries(env).map(([key, value]) => [key, maskValue(value)])),
+          all: false,
+          env: maskEnv(env),
+          scopes: [],
           changes,
-        };
+        } satisfies EnvOutput;
       },
-      ({ env, changes }) => {
+      ({ env, scopes, changes, all }) => {
+        if (all) {
+          renderAllScopes(name, scopes);
+          return;
+        }
+
         const scope = directory === '/' ? 'global' : directory;
         if (changes.length === 0) {
           const keys = Object.keys(env);
@@ -73,5 +113,25 @@ export async function toolEnv(
     );
   } finally {
     kazi.close();
+  }
+}
+
+function maskEnv(env: Record<string, string>): Record<string, string> {
+  return Object.fromEntries(Object.entries(env).map(([key, value]) => [key, maskValue(value)]));
+}
+
+function renderAllScopes(name: string, scopes: EnvScopeOutput[]): void {
+  if (scopes.length === 0) {
+    console.log(`No env vars for tool "${name}" in any scope`);
+    return;
+  }
+
+  console.log(`Env vars for tool "${name}" across all scopes:`);
+  for (const scope of scopes) {
+    const label = scope.global ? 'global' : scope.directory;
+    console.log(`\n${label}:`);
+    for (const [key, value] of Object.entries(scope.env)) {
+      console.log(`  ${key}=${value}`);
+    }
   }
 }

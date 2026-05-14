@@ -16,7 +16,7 @@ import { toolShow } from './commands/tool-show.js';
 import { toolLlm } from './commands/tool-llm.js';
 import { toolSpec } from './commands/tool-spec.js';
 import { exec } from './commands/exec.js';
-import { runToolCommand } from './commands/tool-command.js';
+import { runToolCommand, toolCommands } from './commands/tool-command.js';
 import { usage } from './commands/usage.js';
 import { log } from './commands/log.js';
 
@@ -91,6 +91,7 @@ async function main(): Promise<void> {
     .command('env <name>')
     .description('Manage environment variables for a tool')
     .option('-g, --global', 'Manage env vars in global scope')
+    .option('-a, --all', 'List env vars across all directory scopes for this tool')
     .option('--json', 'Print machine-readable JSON output')
     .argument('[pairs...]', 'Env entries as KEY=VALUE; use KEY= to delete')
     .action(toolEnv);
@@ -127,6 +128,18 @@ async function main(): Promise<void> {
     .action(exec);
 
   program
+    .command('commands [toolName] [commandName]')
+    .description('List CLI commands exposed by installed tools')
+    .option('--json', 'Print machine-readable JSON output')
+    .action(toolCommands);
+
+  program
+    .command('command [toolName] [commandName]')
+    .description('List CLI commands exposed by installed tools')
+    .option('--json', 'Print machine-readable JSON output')
+    .action(toolCommands);
+
+  program
     .command('log')
     .description('Show the current log file path')
     .option('--file', 'Print the log file path')
@@ -147,7 +160,7 @@ async function main(): Promise<void> {
   const firstArg = process.argv[2];
 
   if (firstArg && !firstArg.startsWith('-') && !knownCommands.has(firstArg)) {
-    await runToolCommand(firstArg, process.argv[3], process.argv.slice(4), process.cwd());
+    await runToolCommand(firstArg, process.argv.slice(3), process.cwd());
   } else {
     program.parse();
   }
