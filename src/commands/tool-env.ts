@@ -7,6 +7,10 @@ interface EnvScopeOutput {
   env: Record<string, string>;
 }
 
+interface EnvScopeSource {
+  getEnvScopes?: (toolName: string) => Array<{ directory: string; env: Record<string, string> }>;
+}
+
 interface EnvOutput {
   toolName: string;
   directory: string | null;
@@ -28,7 +32,7 @@ export async function toolEnv(
   try {
     await runCliCommand<EnvOutput>(
       options,
-      () => {
+      async () => {
         const changes: Array<{ action: 'set' | 'delete'; key: string; deleted?: boolean }> = [];
         for (const pair of pairs) {
           const eqIndex = pair.indexOf('=');
@@ -50,11 +54,10 @@ export async function toolEnv(
         }
 
         if (options.all === true) {
-          const scopes = kazi.tools.getEnvScopes(name).map((scope) => ({
-            directory: scope.directory,
-            global: scope.directory === '/',
-            env: maskEnv(scope.env),
-          }));
+          const source = kazi.tools as EnvScopeSource;
+          const scopes = source.getEnvScopes
+            ? source.getEnvScopes(name).map(toEnvScopeOutput)
+            : await getEnvScopesFromRegisteredTools(name);
           return {
             toolName: name,
             directory: null,
@@ -114,10 +117,31 @@ export async function toolEnv(
   } finally {
     kazi.close();
   }
+
+  async function getEnvScopesFromRegisteredTools(toolName: string): Promise<EnvScopeOutput[]> {
+    const tools = await kazi.tools.listAll();
+    const directories = ['/', ...tools
+      .filter((tool) => tool.name === toolName)
+      .map((tool) => tool.directory)];
+    return [...new Set(directories)]
+      .map((scopeDirectory) => toEnvScopeOutput({
+        directory: scopeDirectory,
+        env: kazi.tools.getEnvAtDirectory(toolName, scopeDirectory),
+      }))
+      .filter((scope) => Object.keys(scope.env).length > 0);
+  }
 }
 
 function maskEnv(env: Record<string, string>): Record<string, string> {
   return Object.fromEntries(Object.entries(env).map(([key, value]) => [key, maskValue(value)]));
+}
+
+function toEnvScopeOutput(scope: { directory: string; env: Record<string, string> }): EnvScopeOutput {
+  return {
+    directory: scope.directory,
+    global: scope.directory === '/',
+    env: maskEnv(scope.env),
+  };
 }
 
 function renderAllScopes(name: string, scopes: EnvScopeOutput[]): void {
