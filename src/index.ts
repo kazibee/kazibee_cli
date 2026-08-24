@@ -19,6 +19,7 @@ import { exec } from './commands/exec.js';
 import { runToolCommand, toolCommands } from './commands/tool-command.js';
 import { usage } from './commands/usage.js';
 import { log } from './commands/log.js';
+import { configureExtensionCommands } from './commands/extension.js';
 
 async function main(): Promise<void> {
   const program = new Command();
@@ -26,16 +27,16 @@ async function main(): Promise<void> {
   program
     .name('kazibee')
     .description(
-      'kazibee - tool management and sandboxed execution CLI\n\n' +
-      'IMPORTANT: Before using any tool, read its documentation first:\n' +
-      '  kazibee llm              Read the llm.txt for the current project\n' +
-      '  kazibee llm <toolName>   Read the llm.txt for a specific tool\n' +
-      '  kazibee show             Print the .d.ts interface for all tools\n' +
-      '  kazibee show <toolName>  Print the .d.ts interface for a specific tool\n\n' +
-      'Always run "kazibee llm <tool>" and "kazibee show <tool>" before working\n' +
-      'with a tool to understand its API, types, capabilities, and usage patterns.'
+      'kazibee - extension package development and compatibility CLI\n\n' +
+      'Primary workflow:\n' +
+      '  kazibee extension prepare [path]  Generate, validate, and seal a package\n' +
+      '  kazibee extension verify [path]   Verify a package without modifying it\n' +
+      '  kazibee extension link [path]     Link a validated local package\n\n' +
+      'Legacy tool runtime commands remain temporarily for compatibility.'
     )
-    .version('0.1.0');
+    .version('0.1.2');
+
+  configureExtensionCommands(program);
 
   program
     .command('install <name> <source>')

@@ -55,9 +55,8 @@ export async function toolEnv(
 
         if (options.all === true) {
           const source = kazi.tools as EnvScopeSource;
-          const scopes = source.getEnvScopes
-            ? source.getEnvScopes(name).map(toEnvScopeOutput)
-            : await getEnvScopesFromRegisteredTools(name);
+          const declaredDirectories = source.getEnvScopes?.(name).map((scope) => scope.directory) ?? [];
+          const scopes = await getEnvScopesFromRegisteredTools(name, declaredDirectories);
           return {
             toolName: name,
             directory: null,
@@ -118,9 +117,12 @@ export async function toolEnv(
     kazi.close();
   }
 
-  async function getEnvScopesFromRegisteredTools(toolName: string): Promise<EnvScopeOutput[]> {
+  async function getEnvScopesFromRegisteredTools(
+    toolName: string,
+    declaredDirectories: string[] = [],
+  ): Promise<EnvScopeOutput[]> {
     const tools = await kazi.tools.listAll();
-    const directories = ['/', ...tools
+    const directories = ['/', process.cwd(), ...declaredDirectories, ...tools
       .filter((tool) => tool.name === toolName)
       .map((tool) => tool.directory)];
     return [...new Set(directories)]

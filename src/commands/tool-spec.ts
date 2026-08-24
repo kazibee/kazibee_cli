@@ -2,12 +2,14 @@ import linkSpec from '../../specs/LINK_SPEC.md' with { type: 'text' };
 import permissionsSpec from '../../specs/PERMISSIONS_SPEC.md' with { type: 'text' };
 import commandArgsSpec from '../../specs/COMMAND_ARGS_SPEC.md' with { type: 'text' };
 import contextSpec from '../../specs/CONTEXT_SPEC.md' with { type: 'text' };
+import extensionPackageSpec from '../../specs/EXTENSION_PACKAGE_SPEC.md' with { type: 'text' };
 
 const SPEC_REGISTRY = {
   LINK_SPEC: linkSpec,
   PERMISSIONS_SPEC: permissionsSpec,
   COMMAND_ARGS: commandArgsSpec,
   CONTEXT_SPEC: contextSpec,
+  EXTENSION_PACKAGE_SPEC: extensionPackageSpec,
 } as const;
 
 type SpecName = keyof typeof SPEC_REGISTRY;
