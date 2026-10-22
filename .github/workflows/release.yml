@@ -21,6 +21,32 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Runs first so a forgotten version bump fails in seconds instead of
+      # overwriting an already-published release and the `latest` assets.
+      - name: Require an unreleased version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(sed -n 's/^[[:space:]]*"version":[[:space:]]*"\([^"]*\)".*/\1/p' package.json | head -n 1)"
+          if [ -z "${VERSION}" ]; then
+            echo "::error::Could not read the version from package.json."
+            exit 1
+          fi
+          RELEASE_NAME="v${VERSION}"
+
+          if gh release view "${RELEASE_NAME}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            echo "::error::Release ${RELEASE_NAME} already exists. Bump the version in package.json before pushing to release."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_NAME}" >/dev/null 2>&1; then
+            echo "::error::Tag ${RELEASE_NAME} already exists. Bump the version in package.json before pushing to release."
+            exit 1
+          fi
+
+          echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+          echo "RELEASE_NAME=${RELEASE_NAME}" >> "${GITHUB_ENV}"
+          echo "Releasing ${RELEASE_NAME}"
+
       - name: Trust GitHub SSH host
         run: |
           mkdir -p ~/.ssh
@@ -40,14 +66,6 @@ jobs:
 
       - name: Build bundled package
         run: bun run build
-
-      - name: Resolve release version
-        run: |
-          VERSION="$(bun -e "console.log(require('./package.json').version)")"
-          RELEASE_NAME="v${VERSION}"
-
-          echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
-          echo "RELEASE_NAME=${RELEASE_NAME}" >> "${GITHUB_ENV}"
 
       - name: Build release binaries
         run: |
@@ -99,14 +117,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${RELEASE_NAME}" >/dev/null 2>&1; then
-            gh release upload "${RELEASE_NAME}" release/assets/* --clobber
-          else
-            gh release create "${RELEASE_NAME}" release/assets/* \
-              --target "${GITHUB_SHA}" \
-              --title "kazibee ${RELEASE_NAME}" \
-              --notes "Automated kazibee ${RELEASE_NAME} release from branch ${GITHUB_REF_NAME} at ${GITHUB_SHA}."
-          fi
+          # Create-only: fails instead of replacing assets if the release appeared mid-run.
+          gh release create "${RELEASE_NAME}" release/assets/* \
+            --target "${GITHUB_SHA}" \
+            --title "kazibee ${RELEASE_NAME}" \
+            --notes "Automated kazibee ${RELEASE_NAME} release from branch ${GITHUB_REF_NAME} at ${GITHUB_SHA}."
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
