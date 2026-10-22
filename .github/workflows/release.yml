@@ -35,6 +35,9 @@ jobs:
       - name: Type check
         run: bun run lint
 
+      - name: Test
+        run: bun test
+
       - name: Build bundled package
         run: bun run build
 
@@ -64,10 +67,13 @@ jobs:
       - name: Smoke test native macOS binary
         run: |
           case "$(uname -m)" in
-            arm64) release/bin/kazibee-macos-arm64 --help ;;
-            x86_64) release/bin/kazibee-macos-x64 --help ;;
+            arm64) BIN=release/bin/kazibee-macos-arm64 ;;
+            x86_64) BIN=release/bin/kazibee-macos-x64 ;;
             *) echo "Unsupported macOS architecture: $(uname -m)" && exit 1 ;;
           esac
+          "${BIN}" --help
+          # The package contract is embedded at build time; the binary must print it.
+          "${BIN}" spec | grep -q "Kazibee Extension Package Contract"
 
       - name: Package release assets
         run: |

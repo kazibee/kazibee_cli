@@ -1,5 +1,4 @@
 # Kazibee Docs
 
-This folder is for general documentation and implementation notes.
-
-Internal command specs used by `kazibee spec` are stored in `specs/` and statically embedded at build time.
+The extension package contract lives in `../specs/EXTENSION_PACKAGE_SPEC.md`.
+CLI usage is in `../README.md`; the agent-facing guide is `../llm.txt`.

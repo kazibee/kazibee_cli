@@ -79,7 +79,3 @@ export async function runCliCommand<T>(
     process.exitCode = 1;
   }
 }
-
-export function maskValue(value: string): string {
-  return `${value.slice(0, 4)}****`;
-}
