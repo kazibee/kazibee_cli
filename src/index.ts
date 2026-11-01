@@ -13,7 +13,7 @@ program
     'Extensions are installed from GitHub in the desktop app (Settings → Tools), which\n' +
     'also generates their TypeScript API. Commit only your source.',
   )
-  .version('0.3.0');
+  .version('0.3.1');
 
 configurePackageCommands(program);
 
